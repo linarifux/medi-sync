@@ -4,6 +4,7 @@ import axios from 'axios';
 const API = axios.create({
   // Use the Vite environment variable, fallback to localhost if it's missing
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api', 
+  
 });
 
 // Add a request interceptor to automatically attach the token if the user is logged in

@@ -22,11 +22,14 @@ const app = express();
 
 // Middlewares
 app.use(helmet()); // Security headers
+
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:3000", "https://medi-sync-six.vercel.app/", "https://medi-syn.netlify.app/"]
+  origin: ["https://medi-syn.netlify.app", "http://localhost:5173", "http://localhost:5000", "https://medi-sync-six.vercel.app"], // Allow requests from these origins
 })); // Allow cross-origin requests from frontend
+
 app.use(express.json()); // Parse incoming JSON payloads
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded data
+
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev')); // API logging
 }
