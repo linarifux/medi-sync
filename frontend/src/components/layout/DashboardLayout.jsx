@@ -5,7 +5,7 @@ import { logout, reset } from '../../features/auth/authSlice';
 import { 
   Activity, LogOut, Package, Clock, ShoppingCart, 
   User as UserIcon, Menu, X, ChevronRight,
-  ShoppingCartIcon
+  PackagePlus, Users, Shield
 } from 'lucide-react';
 
 const DashboardLayout = ({ children }) => {
@@ -29,17 +29,27 @@ const DashboardLayout = ({ children }) => {
     navigate('/');
   };
 
+  // Define navigation items with Role-Based Access Control (RBAC)
   const navItems = [
-    { name: 'Inventory', path: '/dashboard', icon: Package },
-    { name: 'Restock Hub', path: '/restock', icon: ShoppingCartIcon },
-    { name: 'Order History', path: '/orders', icon: ShoppingCart },
-    { name: 'Consumption Log', path: '/history', icon: Clock },
+    { name: 'Inventory', path: '/dashboard', icon: Package, adminOnly: false },
+    { name: 'Restock Hub', path: '/restock', icon: PackagePlus, adminOnly: true }, // Optional: restrict restocking to admins
+    { name: 'Order History', path: '/orders', icon: ShoppingCart, adminOnly: false },
+    { name: 'Consumption Log', path: '/history', icon: Clock, adminOnly: false },
+    { name: 'Users', path: '/users', icon: Users, adminOnly: true }, // Only admins can manage users
   ];
+
+  // Filter items based on user role (assume 'admin' if role isn't explicitly set yet)
+  const visibleNavItems = navItems.filter(item => {
+    if (item.adminOnly) {
+      return user?.role === 'admin' || !user?.role; 
+    }
+    return true;
+  });
 
   // Reusable NavLinks component for both Desktop and Mobile views
   const NavLinks = () => (
     <nav className="space-y-1.5">
-      {navItems.map((item) => {
+      {visibleNavItems.map((item) => {
         const isActive = location.pathname === item.path;
         const Icon = item.icon;
         return (
@@ -109,13 +119,24 @@ const DashboardLayout = ({ children }) => {
             
             {/* Right: User Profile & Logout */}
             <div className="flex items-center gap-3 sm:gap-5">
-              <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 pl-2 pr-4 py-1.5 rounded-full shadow-sm">
-                <div className="bg-blue-100 p-1 rounded-full">
-                  <UserIcon className="h-4 w-4 text-blue-700" />
+              
+              {/* Profile Badge */}
+              <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 pl-2 pr-4 py-1.5 rounded-full shadow-sm">
+                <div className={`p-1.5 rounded-full ${user?.role === 'admin' || !user?.role ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                  {user?.role === 'admin' || !user?.role ? (
+                    <Shield className="h-4 w-4 text-purple-700" />
+                  ) : (
+                    <UserIcon className="h-4 w-4 text-blue-700" />
+                  )}
                 </div>
-                <span className="text-sm font-bold text-gray-700 truncate max-w-[120px] sm:max-w-[200px]">
-                  {user?.name || 'Admin'}
-                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-gray-800 leading-tight truncate max-w-[100px] sm:max-w-[160px]">
+                    {user?.name || 'Admin'}
+                  </span>
+                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider leading-tight">
+                    {user?.role || 'Administrator'}
+                  </span>
+                </div>
               </div>
               
               <button
@@ -169,7 +190,7 @@ const DashboardLayout = ({ children }) => {
 
         {/* 3. Dynamic Page Content */}
         {/* min-w-0 prevents flex items from overflowing when dealing with large tables/data */}
-        <main className="flex-1 bg-white p-5 md:p-8 rounded-2xl shadow-sm border border-gray-100 w-full min-w-0 flex flex-col">
+        <main className="flex-1 bg-white p-5 md:p-8 rounded-2xl shadow-sm border border-gray-100 w-full min-w-0 flex flex-col relative z-0">
           {children}
         </main>
         

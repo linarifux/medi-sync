@@ -7,6 +7,7 @@ import Inventory from './pages/admin/Inventory'; // <-- Import the new page
 import MedicineDetail from './pages/admin/MedicineDetail';
 import Restock from './pages/admin/Restock';
 import ScrollToTop from './components/ScrollToTop';
+import UserManagement from './pages/admin/UserManagement';
 
 function App() {
   return (
@@ -39,6 +40,8 @@ function App() {
 
 
           <Route path="/restock" element={<ProtectedRoute><DashboardLayout><Restock /></DashboardLayout></ProtectedRoute>} />
+
+        <Route path="/users" element={<ProtectedRoute><DashboardLayout><UserManagement /></DashboardLayout></ProtectedRoute>} />
         </Routes>
 
         <ScrollToTop />
