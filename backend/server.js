@@ -10,7 +10,6 @@ import historyRoutes from './routes/historyRoutes.js'; // Add this at the top
 import adminRoutes from './routes/adminRoutes.js'; // Add this line
 import medicineRoutes from './routes/medicineRoutes.js'; // Add this line
 import orderRoutes from './routes/orderRoutes.js';
-import startCronJobs from './utils/cronJobs.js';
 
 
 // Load environment variables
@@ -34,10 +33,6 @@ app.use(express.urlencoded({ extended: true })); // Parse URL-encoded data
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev')); // API logging
 }
-
-
-startCronJobs();
-
 
 
 // Basic Route
