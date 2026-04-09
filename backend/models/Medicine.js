@@ -9,6 +9,22 @@ const orderSchema = new mongoose.Schema({
   purchaseDate: { type: Date, default: Date.now },
 });
 
+// NEW: Sub-schema for the Consumption Log / Daily Tracker
+const consumptionSchema = new mongoose.Schema({
+  date: { type: Date, required: true, default: Date.now },
+  status: { 
+    type: String, 
+    enum: ['taken', 'skipped', 'missed'], 
+    required: true,
+    default: 'taken'
+  },
+  notes: { type: String, trim: true },
+  recordedBy: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User' // Tracks WHICH family member/caregiver marked it as taken
+  }
+});
+
 const medicineSchema = new mongoose.Schema(
   {
     name: {
@@ -42,7 +58,7 @@ const medicineSchema = new mongoose.Schema(
       default: 'default_medicine.png',
     },
     
-    // NEW: Additional Info for Medicine Details Page
+    // Additional Info for Medicine Details Page
     purpose: { 
       type: String,
       trim: true
@@ -52,14 +68,17 @@ const medicineSchema = new mongoose.Schema(
       trim: true
     },
 
-    // NEW: Lazy Evaluation Timestamp for Nightly Deductions
+    // Lazy Evaluation Timestamp for Nightly Deductions
     lastDeductedAt: {
       type: Date,
       default: Date.now,
     },
 
-    // NEW: Embedded array to track purchases from the Restock Hub
+    // Embedded array to track purchases from the Restock Hub
     orderHistory: [orderSchema],
+
+    // NEW: Embedded array to track daily intake for the Consumption Log
+    consumptionHistory: [consumptionSchema],
 
     adminId: {
       type: mongoose.Schema.Types.ObjectId,

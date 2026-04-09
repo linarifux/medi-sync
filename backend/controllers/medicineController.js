@@ -144,13 +144,15 @@ export const createMedicine = asyncHandler(async (req, res) => {
 });
 
 
-// @desc    Update a medicine
+// @desc    Update a medicine (Handles Edits, Restocks, and Consumption Logging)
 // @route   PUT /api/medicines/:id
-// @access  Private/Admin
+// @access  Private
 export const updateMedicine = asyncHandler(async (req, res) => {
   const { 
     name, dosage, frequency, consumptionRate, 
-    stockLeft, packSize, purpose, instructions, latestOrder 
+    stockLeft, packSize, purpose, instructions, 
+    latestOrder, 
+    consumptionRecord // NEW: Handle incoming consumption logs
   } = req.body;
 
   const medicine = await Medicine.findById(req.params.id);
@@ -170,9 +172,18 @@ export const updateMedicine = asyncHandler(async (req, res) => {
     medicine.purpose = purpose || medicine.purpose;
     medicine.instructions = instructions || medicine.instructions;
 
+    // Handle Restock History
     if (latestOrder) {
       medicine.orderHistory.push(latestOrder);
-      // Optional: Don't reset `lastDeductedAt` here so we don't lose track of partial weeks when restocking!
+    }
+
+    // NEW: Handle Consumption History
+    // If the frontend sends a 'consumptionRecord' object, push it to the history
+    if (consumptionRecord) {
+      // Automatically attach the ID of the user performing this action
+      consumptionRecord.recordedBy = req.user._id;
+      // Push to the beginning of the array so the newest logs are first (optional, but helpful)
+      medicine.consumptionHistory.unshift(consumptionRecord); 
     }
 
     if (req.file) {

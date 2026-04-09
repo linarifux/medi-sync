@@ -468,8 +468,16 @@ const Inventory = () => {
                   {/* Medicine Details */}
                   <td className="py-4 px-2 align-top">
                     <div className="font-bold text-lg text-black capitalize leading-tight">{med.name}</div>
-                    <div className="text-sm text-gray-600 mt-1">{med.dosage}</div>
+                    <div className="text-sm text-gray-800 mt-1 font-semibold">{med.dosage} • {med.consumptionRate} {med.frequency}</div>
                     <div className="text-xs text-gray-500 mt-0.5">{med.packSize}</div>
+                    
+                    {/* NEW: Render Purpose & Instructions on the PDF for the Caregiver */}
+                    {(med.purpose || med.instructions) && (
+                      <div className="mt-2 text-[11px] text-gray-700 bg-gray-50 p-2 border border-gray-200 rounded">
+                        {med.purpose && <div className="mb-0.5"><strong>Purpose:</strong> {med.purpose}</div>}
+                        {med.instructions && <div><strong>Notes:</strong> {med.instructions}</div>}
+                      </div>
+                    )}
                   </td>
                   
                   {/* Stock Left */}
@@ -478,7 +486,7 @@ const Inventory = () => {
                       {med.stockLeft} <span className="text-xs font-normal">units</span>
                     </div>
                     {needsRestock && (
-                      <div className="text-xs font-bold text-black mt-1 uppercase border border-black inline-block px-1 rounded-sm">
+                      <div className="text-[10px] font-bold text-black mt-1 uppercase border border-black inline-block px-1 rounded-sm">
                         Low Stock
                       </div>
                     )}
@@ -500,7 +508,10 @@ const Inventory = () => {
 
                   {/* Price Field */}
                   <td className="py-4 px-2 align-bottom text-right">
-                    <div className="border-b-2 border-dashed border-gray-400 w-full h-8 mb-1"></div>
+                    <div className="flex items-end justify-end gap-1 text-gray-500">
+                      <span className="font-bold text-sm mb-1">৳</span>
+                      <div className="border-b-2 border-dashed border-gray-400 w-full h-8 mb-1"></div>
+                    </div>
                   </td>
 
                 </tr>
@@ -510,10 +521,11 @@ const Inventory = () => {
         </table>
 
         {/* Print Footer */}
-        <div className="mt-12 border-t border-gray-200 pt-4 flex justify-between items-center text-sm text-gray-500">
+        <div className="mt-12 border-t border-gray-200 pt-4 flex justify-between items-center text-sm text-gray-500 break-inside-avoid">
           <p>Total Items: {filteredMedicines.length}</p>
           <div className="flex items-center gap-2">
-            <span>Total Cost:</span>
+            <span className="font-bold text-black">Total Cost:</span>
+            <span className="font-bold text-black">৳</span>
             <div className="border-b border-black w-32"></div>
           </div>
         </div>
