@@ -18,32 +18,56 @@ const processCatchUpDeductions = async (medicine) => {
   // 4. Find how many calendar days have passed
   const daysPassed = todayStart.diff(lastDeductedStart, 'days');
 
+  // --- 🐛 DEBUG LOGS (Watch your backend terminal!) ---
+  console.log(`\n📦 Checking: ${medicine.name}`);
+  console.log(`   - Today (Dhaka): ${todayStart.format('YYYY-MM-DD')}`);
+  console.log(`   - Last Deducted: ${lastDeductedStart.format('YYYY-MM-DD')}`);
+  console.log(`   - Days Passed: ${daysPassed}`);
+  // ----------------------------------------------------
+
   // If days have passed and we have stock left, we need to deduct!
   if (daysPassed > 0 && medicine.stockLeft > 0) {
     const unitsPerDose = medicine.consumptionRate || 1;
-    let dosesPerDay = 1;
     const f = (medicine.frequency || '').toLowerCase();
+    
+    let unitsToDeduct = 0;
+    let daysToAdvance = 0;
 
-    // Determine daily dosage
-    if (f.includes('twice') || f.includes('2')) dosesPerDay = 2;
-    else if (f.includes('thrice') || f.includes('3')) dosesPerDay = 3;
-    else if (f.includes('four') || f.includes('4')) dosesPerDay = 4;
-    else if (f.includes('weekly')) {
-      dosesPerDay = 1 / 7; // Deduct 1 unit for every 7 days passed
+    if (f.includes('weekly')) {
+      // Calculate how many FULL weeks have passed
+      const weeksPassed = Math.floor(daysPassed / 7);
+      if (weeksPassed > 0) {
+        unitsToDeduct = weeksPassed * unitsPerDose;
+        daysToAdvance = weeksPassed * 7; // Only advance the clock by full weeks to preserve remainder days
+      }
+    } else {
+      // Daily, twice daily, thrice daily, etc.
+      let dosesPerDay = 1;
+      if (f.includes('twice') || f.includes('2')) dosesPerDay = 2;
+      else if (f.includes('thrice') || f.includes('3')) dosesPerDay = 3;
+      else if (f.includes('four') || f.includes('4')) dosesPerDay = 4;
+      
+      unitsToDeduct = daysPassed * unitsPerDose * dosesPerDay;
+      daysToAdvance = daysPassed; // Advance the clock by all days passed
     }
 
-    // Calculate exact units to deduct
-    const unitsToDeduct = Math.floor(daysPassed * (unitsPerDose * dosesPerDay));
+    console.log(`   - Calculated Deduction: ${unitsToDeduct} units`);
 
     if (unitsToDeduct > 0) {
       medicine.stockLeft = Math.max(0, medicine.stockLeft - unitsToDeduct);
+      
+      // Advance the clock by the exact processed days (preserves remainders for weekly meds)
+      medicine.lastDeductedAt = lastDeductedStart.clone().add(daysToAdvance, 'days').toDate();
+      
+      await medicine.save();
+      console.log(`   ✅ DEDUCTED! New Stock Left: ${medicine.stockLeft}`);
+    } else {
+      console.log(`   ⚠️ Skipped deduction (Likely a weekly med that hasn't hit 7 full days yet).`);
     }
-    
-    // Update the timestamp to today so we don't deduct again until tomorrow
-    medicine.lastDeductedAt = nowInDhaka.toDate();
-    
-    // Save the updated stock back to the database
-    await medicine.save();
+  } else if (daysPassed === 0) {
+    console.log(`   ⏭️ Skipped: 0 days have passed since the last deduction.`);
+  } else if (medicine.stockLeft <= 0) {
+    console.log(`   ⏭️ Skipped: Stock is already empty.`);
   }
 
   return medicine;
@@ -54,16 +78,12 @@ const processCatchUpDeductions = async (medicine) => {
 // @route   GET /api/medicines
 // @access  Private
 export const getMedicines = asyncHandler(async (req, res) => {
-  // Fetch all medicines (If you want it scoped to admin/user later, add { adminId: req.user._id })
   let medicines = await Medicine.find({});
 
   // Run catch-up logic and calculate frontend stock info concurrently
   const medicinesWithStockInfo = await Promise.all(
     medicines.map(async (med) => {
-      // 1. Deduct any stock if days have passed since last check
       const updatedMed = await processCatchUpDeductions(med);
-      
-      // 2. Attach dynamic stock info (Next Order Date, etc.)
       const stockInfo = calculateNextOrderDate(updatedMed.stockLeft, updatedMed.consumptionRate, updatedMed.frequency);
       
       return {
@@ -84,9 +104,7 @@ export const getMedicineById = asyncHandler(async (req, res) => {
   let medicine = await Medicine.findById(req.params.id);
 
   if (medicine) {
-    // Make sure stock is perfectly up to date before viewing details
     medicine = await processCatchUpDeductions(medicine);
-    
     const stockInfo = calculateNextOrderDate(medicine.stockLeft, medicine.consumptionRate, medicine.frequency);
     res.json({
       ...medicine._doc,
@@ -105,7 +123,6 @@ export const getMedicineById = asyncHandler(async (req, res) => {
 export const createMedicine = asyncHandler(async (req, res) => {
   const { name, dosage, frequency, consumptionRate, stockLeft, packSize, purpose, instructions } = req.body;
   
-  // Use Cloudinary URL if uploaded, otherwise use a generic placeholder
   const photoPath = req.file ? req.file.path : 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg'; 
 
   const medicine = new Medicine({
@@ -115,11 +132,11 @@ export const createMedicine = asyncHandler(async (req, res) => {
     consumptionRate,
     stockLeft,
     packSize,
-    purpose,          // NEW
-    instructions,     // NEW
+    purpose,
+    instructions,
     photo: photoPath,
     adminId: req.user._id,
-    lastDeductedAt: new Date(), // Start tracking from the moment it's created
+    lastDeductedAt: moment().tz('Asia/Dhaka').toDate(), // Enforce Dhaka time immediately
   });
 
   const createdMedicine = await medicine.save();
@@ -127,7 +144,7 @@ export const createMedicine = asyncHandler(async (req, res) => {
 });
 
 
-// @desc    Update a medicine (Handles both general edits and Restock logic)
+// @desc    Update a medicine
 // @route   PUT /api/medicines/:id
 // @access  Private/Admin
 export const updateMedicine = asyncHandler(async (req, res) => {
@@ -143,22 +160,23 @@ export const updateMedicine = asyncHandler(async (req, res) => {
     medicine.dosage = dosage || medicine.dosage;
     medicine.frequency = frequency || medicine.frequency;
     medicine.consumptionRate = consumptionRate || medicine.consumptionRate;
-    medicine.stockLeft = stockLeft !== undefined ? stockLeft : medicine.stockLeft;
-    medicine.packSize = packSize || medicine.packSize;
-    medicine.purpose = purpose || medicine.purpose;             // NEW
-    medicine.instructions = instructions || medicine.instructions; // NEW
-
-    // NEW: Handle Restock / Order History
-    // If the frontend sends a 'latestOrder' object, push it to the orderHistory array
-    if (latestOrder) {
-      medicine.orderHistory.push(latestOrder);
-      // Reset the deduction timer so it doesn't accidentally double-deduct today
-      medicine.lastDeductedAt = moment().tz('Asia/Dhaka').toDate(); 
+    
+    // Only update stockLeft manually if specifically provided by the frontend
+    if (stockLeft !== undefined) {
+      medicine.stockLeft = stockLeft;
     }
 
-    // Update photo only if a new file is uploaded
+    medicine.packSize = packSize || medicine.packSize;
+    medicine.purpose = purpose || medicine.purpose;
+    medicine.instructions = instructions || medicine.instructions;
+
+    if (latestOrder) {
+      medicine.orderHistory.push(latestOrder);
+      // Optional: Don't reset `lastDeductedAt` here so we don't lose track of partial weeks when restocking!
+    }
+
     if (req.file) {
-      medicine.photo = req.file.path; // Save new Cloudinary URL
+      medicine.photo = req.file.path; 
     }
 
     const updatedMedicine = await medicine.save();
