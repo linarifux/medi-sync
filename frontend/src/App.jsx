@@ -8,6 +8,7 @@ import MedicineDetail from './pages/admin/MedicineDetail';
 import Restock from './pages/admin/Restock';
 import ScrollToTop from './components/ScrollToTop';
 import UserManagement from './pages/admin/UserManagement';
+import ConsumptionLog from './pages/admin/ConsumptionLog';
 
 function App() {
   return (
@@ -36,7 +37,7 @@ function App() {
           
           <Route path="/orders" element={<ProtectedRoute><DashboardLayout><div>Orders Page</div></DashboardLayout></ProtectedRoute>} />
 
-          <Route path="/history" element={<ProtectedRoute><DashboardLayout><div>History Page</div></DashboardLayout></ProtectedRoute>} />
+          <Route path="/history" element={<ProtectedRoute><DashboardLayout><ConsumptionLog /></DashboardLayout></ProtectedRoute>} />
 
 
           <Route path="/restock" element={<ProtectedRoute><DashboardLayout><Restock /></DashboardLayout></ProtectedRoute>} />
