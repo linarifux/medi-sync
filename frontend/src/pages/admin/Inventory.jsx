@@ -10,8 +10,8 @@ import { format } from 'date-fns';
 import AddMedicineModal from '../../components/medicine/AddMedicineModal';
 import EditMedicineModal from '../../components/medicine/EditMedicineModal';
 
-// Helper function to estimate how many strips to order for the remaining days of the month
-const calculateStripsToOrder = (rate, freq, packSize, stockLeft, daysLeft) => {
+// Helper function to estimate how many strips to order
+const calculateStripsToOrder = (rate, freq, packSize, stockLeft, targetDays) => {
   if (!rate || !freq || !packSize) return null;
   
   const packMatch = packSize.toString().match(/\d+/);
@@ -26,8 +26,11 @@ const calculateStripsToOrder = (rate, freq, packSize, stockLeft, daysLeft) => {
   else if (f.includes('four') || f.includes('4')) dosesPerDay = 4;
   else if (f.includes('weekly')) dosesPerDay = 1 / 7;
   
-  const totalUnitsNeeded = unitsPerDose * dosesPerDay * daysLeft;
+  // Calculates total needed for the target timeframe
+  const totalUnitsNeeded = unitsPerDose * dosesPerDay * targetDays;
   const currentStock = parseInt(stockLeft, 10) || 0;
+  
+  // Subtracts whatever stock you currently have!
   const deficit = totalUnitsNeeded - currentStock;
   
   if (deficit <= 0) return 'Stocked';
@@ -47,9 +50,25 @@ const Inventory = () => {
   const dispatch = useDispatch();
   const { medicines, isLoading, isError, message } = useSelector((state) => state.medicines);
 
+  // --- NEW: Dynamic Target Days Calculation ---
   const today = new Date();
-  const daysInCurrentMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const daysLeftInMonth = daysInCurrentMonth - today.getDate() + 1;
+  const currentDate = today.getDate();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+
+  const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const daysLeftInMonth = daysInCurrentMonth - currentDate + 1; // +1 includes today
+
+  let targetDays = daysLeftInMonth;
+  let orderTimeframeLabel = `Next ${daysLeftInMonth} days`;
+
+  // If we are past the 20th, calculate for the rest of this month + ALL of next month
+  if (currentDate > 20) {
+    const daysInNextMonth = new Date(currentYear, currentMonth + 2, 0).getDate();
+    targetDays = daysLeftInMonth + daysInNextMonth;
+    orderTimeframeLabel = `Next ${targetDays} days (inc. next month)`;
+  }
+  // --------------------------------------------
 
   useEffect(() => {
     if (isError) {
@@ -231,7 +250,7 @@ const Inventory = () => {
               <tbody className="bg-white divide-y divide-gray-100">
                 {filteredMedicines.map((med) => {
                   const needsRestock = med.stockInfo?.needsRestock;
-                  const orderSuggestion = calculateStripsToOrder(med.consumptionRate, med.frequency, med.packSize, med.stockLeft, daysLeftInMonth);
+                  const orderSuggestion = calculateStripsToOrder(med.consumptionRate, med.frequency, med.packSize, med.stockLeft, targetDays);
                   
                   return (
                     <tr key={`desktop-${med._id}`} className="hover:bg-blue-50/50 transition-colors group">
@@ -288,7 +307,7 @@ const Inventory = () => {
                             <div className="flex items-center gap-1.5 text-[13px] text-blue-700 font-bold bg-blue-50 px-2 py-1 rounded w-max border border-blue-200 shadow-sm">
                               <ShoppingCart className="h-3.5 w-3.5 shrink-0" /> {orderSuggestion}
                             </div>
-                            <div className="text-[10px] text-gray-400 mt-1 pl-1">Next {daysLeftInMonth} days</div>
+                            <div className="text-[10px] text-gray-400 mt-1 pl-1">{orderTimeframeLabel}</div>
                           </div>
                         ) : (
                           <span className="text-[13px] text-gray-300 italic">Data missing</span>
@@ -318,7 +337,7 @@ const Inventory = () => {
           <div className="md:hidden flex flex-col divide-y divide-gray-100">
             {filteredMedicines.map((med) => {
               const needsRestock = med.stockInfo?.needsRestock;
-              const orderSuggestion = calculateStripsToOrder(med.consumptionRate, med.frequency, med.packSize, med.stockLeft, daysLeftInMonth);
+              const orderSuggestion = calculateStripsToOrder(med.consumptionRate, med.frequency, med.packSize, med.stockLeft, targetDays);
 
               return (
                 <div key={`mobile-${med._id}`} className="p-4 hover:bg-gray-50 transition-colors">
@@ -365,7 +384,10 @@ const Inventory = () => {
                       {orderSuggestion === 'Stocked' ? (
                         <span className="text-xs font-bold text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5"/> Fully Stocked</span>
                       ) : orderSuggestion ? (
-                        <span className="text-xs font-bold text-blue-600 flex items-center gap-1"><ShoppingCart className="h-3.5 w-3.5"/> {orderSuggestion}</span>
+                        <div className="text-right">
+                          <span className="text-xs font-bold text-blue-600 flex items-center gap-1 justify-end"><ShoppingCart className="h-3.5 w-3.5"/> {orderSuggestion}</span>
+                          <div className="text-[10px] text-gray-400 mt-0.5">{orderTimeframeLabel}</div>
+                        </div>
                       ) : (
                         <span className="text-xs text-gray-400">N/A</span>
                       )}
@@ -449,7 +471,7 @@ const Inventory = () => {
           </thead>
           <tbody className="divide-y divide-gray-300">
             {filteredMedicines.map((med, index) => {
-              const orderSuggestion = calculateStripsToOrder(med.consumptionRate, med.frequency, med.packSize, med.stockLeft, daysLeftInMonth);
+              const orderSuggestion = calculateStripsToOrder(med.consumptionRate, med.frequency, med.packSize, med.stockLeft, targetDays);
               const needsRestock = med.stockInfo?.needsRestock;
 
               return (
@@ -471,7 +493,7 @@ const Inventory = () => {
                     <div className="text-sm text-gray-800 mt-1 font-semibold">{med.dosage} • {med.consumptionRate} {med.frequency}</div>
                     <div className="text-xs text-gray-500 mt-0.5">{med.packSize}</div>
                     
-                    {/* NEW: Render Purpose & Instructions on the PDF for the Caregiver */}
+                    {/* Render Purpose & Instructions on the PDF for the Caregiver */}
                     {(med.purpose || med.instructions) && (
                       <div className="mt-2 text-[11px] text-gray-700 bg-gray-50 p-2 border border-gray-200 rounded">
                         {med.purpose && <div className="mb-0.5"><strong>Purpose:</strong> {med.purpose}</div>}
@@ -499,7 +521,7 @@ const Inventory = () => {
                     ) : orderSuggestion ? (
                       <div>
                         <div className="text-base font-bold text-black">{orderSuggestion}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">For {daysLeftInMonth} days</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{orderTimeframeLabel}</div>
                       </div>
                     ) : (
                       <span className="text-sm text-gray-400">N/A</span>
